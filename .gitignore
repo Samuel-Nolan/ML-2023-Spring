@@ -1,2 +1,6 @@
 # Ignore Obsidian workspace settings and plugins.
 **/.obsidian/
+
+# Agent guidelines
+AGENT.md
+AGENTS.md

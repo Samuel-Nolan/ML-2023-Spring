@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="将 ML2023 COVID-19 回归 notebook 拆解为可交互的模块图谱、源码剖面、张量实验室与训练循环。">
+  <title>Notebook Atlas — 把训练代码读成一套系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: oklch(96.5% 0.018 85);
+      --paper-deep: oklch(93% 0.025 85);
+      --paper-raised: oklch(98% 0.012 85);
+      --ink: oklch(28% 0.055 235);
+      --ink-soft: oklch(43% 0.04 225);
+      --muted: oklch(51% 0.032 225);
+      --line: oklch(81% 0.035 220);
+      --line-strong: oklch(64% 0.065 225);
+      --blue: oklch(47% 0.11 230);
+      --blue-soft: oklch(90% 0.035 225);
+      --orange: oklch(63% 0.17 45);
+      --orange-dark: oklch(47% 0.135 45);
+      --orange-soft: oklch(91% 0.055 65);
+      --success: oklch(47% 0.105 155);
+      --code-bg: oklch(94.5% 0.02 220);
+      --font-body: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      --font-display: "Noto Serif SC", "Songti SC", serif;
+      --font-mono: "IBM Plex Mono", "Cascadia Code", monospace;
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --content: 1440px;
+      --gutter: clamp(1.25rem, 4vw, 4.5rem);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 6rem; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background-color: var(--paper);
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px),
+        linear-gradient(var(--line-strong) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line-strong) 1px, transparent 1px);
+      background-size: 32px 32px, 32px 32px, 160px 160px, 160px 160px;
+      background-position: -1px -1px;
+      font-family: var(--font-body);
+      font-size: 1rem;
+      line-height: 1.75;
+      font-kerning: normal;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: var(--paper);
+      opacity: 0.89;
+      pointer-events: none;
+    }
+    button, input { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { color: inherit; }
+    a { color: inherit; text-decoration: none; }
+    img, canvas, svg { display: block; max-width: 100%; }
+    h1, h2, h3, p { margin-top: 0; }
+    button:focus, a:focus, input:focus { outline: none; }
+    button:focus-visible, a:focus-visible, input:focus-visible {
+      outline: 3px solid var(--orange);
+      outline-offset: 3px;
+    }
+    ::selection { background: var(--orange-soft); color: var(--ink); }
+
+    .skip-link {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      z-index: 700;
+      padding: 0.65rem 1rem;
+      background: var(--ink);
+      color: var(--paper);
+      transform: translateY(-180%);
+      transition: transform 180ms var(--ease-out);
+    }
+    .skip-link:focus { transform: translateY(0); }
+    .container { width: min(100%, var(--content)); margin-inline: auto; padding-inline: var(--gutter); }
+    .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+    .section { padding-block: clamp(5rem, 10vw, 9rem); position: relative; }
+    .section + .section { border-top: 1px solid var(--line-strong); }
+    .section-head {
+      display: grid;
+      gap: 1.5rem;
+      margin-bottom: clamp(2.5rem, 5vw, 4.5rem);
+      align-items: end;
+    }
+    .section-index {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--blue);
+      font: 600 0.75rem/1 var(--font-mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 1.25rem;
+    }
+    .section-index::after { content: ""; width: 3.5rem; height: 1px; background: var(--blue); }
+    .section-title {
+      margin-bottom: 0;
+      max-width: 18ch;
+      font: 900 clamp(2rem, 5vw, 3.8rem)/1.25 var(--font-display);
+      letter-spacing: -0.035em;
+    }
+    .section-desc { max-width: 58ch; margin: 0; color: var(--ink-soft); }
+    .eyebrow {
+      color: var(--blue);
+      font: 600 0.72rem/1.4 var(--font-mono);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 1.65rem;
+      padding: 0.2rem 0.55rem;
+      border: 1px solid var(--line-strong);
+      border-radius: 2px;
+      color: var(--ink-soft);
+      background: var(--paper);
+      font: 500 0.68rem/1.2 var(--font-mono);
+      letter-spacing: 0.04em;
+    }
+    .tag.orange { color: var(--orange-dark); border-color: var(--orange); background: var(--orange-soft); }
+    .button {
+      min-height: 2.9rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.65rem;
+      padding: 0.7rem 1.15rem;
+      border: 1px solid var(--ink);
+      border-radius: 2px;
+      background: var(--paper-raised);
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: transform 150ms var(--ease-out), background-color 150ms, color 150ms, box-shadow 150ms;
+    }
+    .button:hover { transform: translate(-2px, -2px); box-shadow: 3px 3px 0 var(--line-strong); }
+    .button:active { transform: translate(0, 0); box-shadow: none; }
+    .button.primary { background: var(--ink); color: var(--paper); box-shadow: 4px 4px 0 var(--orange); }
+    .button.primary:hover { background: var(--blue); box-shadow: 6px 6px 0 var(--orange); }
+    .button.small { min-height: 2.5rem; padding: 0.5rem 0.8rem; font-size: 0.78rem; }
+    .button[aria-pressed="true"], .button.active { background: var(--blue); color: var(--paper-raised); border-color: var(--blue); }
+    .icon-arrow { font-family: var(--font-mono); font-size: 1.1em; }
+
+    .reading-progress {
+      position: fixed;
+      inset: 0 0 auto;
+      height: 3px;
+      z-index: 500;
+      background: var(--line);
+      transform-origin: left;
+    }
+    .reading-progress span { display: block; width: 100%; height: 100%; background: var(--orange); transform: scaleX(0); transform-origin: left; }
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: var(--paper);
+      border-bottom: 1px solid var(--line-strong);
+    }
+    .header-inner { min-height: 4.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .brand { display: flex; align-items: center; gap: 0.75rem; flex: 0 0 auto; }
+    .brand-mark {
+      width: 2rem;
+      height: 2rem;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 3px;
+      transform: rotate(45deg);
+    }
+    .brand-mark i { display: block; background: var(--blue); }
+    .brand-mark i:nth-child(2), .brand-mark i:nth-child(3) { background: var(--orange); }
+    .brand-name { font: 600 0.78rem/1.25 var(--font-mono); letter-spacing: 0.08em; }
+    .brand-name small { display: block; color: var(--muted); font-size: 0.58rem; letter-spacing: 0.16em; }
+    .main-nav { display: none; align-items: center; gap: 1.5rem; }
+    .main-nav a {
+      position: relative;
+      padding-block: 0.7rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: color 150ms;
+    }
+    .main-nav a::after { content: ""; position: absolute; left: 0; right: 100%; bottom: 0.3rem; height: 2px; background: var(--orange); transition: right 250ms var(--ease-out); }
+    .main-nav a:hover, .main-nav a.active { color: var(--ink); }
+    .main-nav a.active::after { right: 0; }
+    .header-progress { color: var(--muted); font: 500 0.68rem/1 var(--font-mono); white-space: nowrap; }
+
+    .hero { min-height: calc(100vh - 4.75rem); padding-block: clamp(3rem, 7vw, 6.5rem) 2rem; display: flex; align-items: center; }
+    .hero-grid { display: grid; gap: 3rem; align-items: center; width: 100%; min-width: 0; }
+    .hero-copy { min-width: 0; }
+    .hero-kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .hero h1 {
+      max-width: 10ch;
+      margin-bottom: 1.75rem;
+      font: 900 clamp(3rem, 8vw, 6.6rem)/1.08 var(--font-display);
+      letter-spacing: -0.065em;
+    }
+    .hero h1 em { color: var(--orange-dark); font-style: normal; position: relative; white-space: nowrap; }
+    .hero h1 em::after { content: ""; position: absolute; left: 0.04em; right: 0; bottom: -0.05em; height: 0.09em; background: var(--orange); z-index: -1; }
+    .hero-lead { max-width: 36rem; color: var(--ink-soft); font-size: clamp(1rem, 1.5vw, 1.15rem); line-height: 1.9; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 0.85rem; margin-top: 2rem; }
+    .hero-note {
+      max-width: 38rem;
+      margin-top: 2.25rem;
+      padding: 1rem 0 0 1rem;
+      border-top: 1px solid var(--line-strong);
+      border-left: 3px solid var(--orange);
+      color: var(--ink-soft);
+      font-size: 0.84rem;
+      line-height: 1.75;
+    }
+    .hero-note strong { color: var(--ink); }
+    .scene-frame {
+      position: relative;
+      min-height: 28rem;
+      border: 1px solid var(--blue);
+      background-color: var(--paper-raised);
+      background-image: radial-gradient(var(--line-strong) 0.8px, transparent 0.8px);
+      background-size: 16px 16px;
+      box-shadow: 10px 10px 0 var(--blue-soft);
+      overflow: hidden;
+    }
+    .scene-frame::before, .scene-frame::after {
+      content: "";
+      position: absolute;
+      width: 1.25rem;
+      height: 1.25rem;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .scene-frame::before { top: 0.6rem; left: 0.6rem; border-top: 2px solid var(--orange); border-left: 2px solid var(--orange); }
+    .scene-frame::after { right: 0.6rem; bottom: 0.6rem; border-right: 2px solid var(--orange); border-bottom: 2px solid var(--orange); }
+    .scene-meta { position: absolute; z-index: 4; top: 1.15rem; left: 1.5rem; right: 1.5rem; display: flex; justify-content: space-between; gap: 1rem; pointer-events: none; }
+    .scene-meta span { color: var(--blue); font: 500 0.62rem/1 var(--font-mono); letter-spacing: 0.1em; }
+    #neural-scene { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+    #neural-scene:active { cursor: grabbing; }
+    .scene-footer { position: absolute; z-index: 4; left: 1.5rem; right: 1.5rem; bottom: 1.2rem; display: flex; align-items: end; justify-content: space-between; gap: 1rem; pointer-events: none; }
+    .scene-instruction { color: var(--muted); font: 500 0.65rem/1.6 var(--font-mono); }
+    .scene-legend { display: flex; gap: 0.8rem; color: var(--ink-soft); font-size: 0.66rem; }
+    .scene-legend span { display: flex; align-items: center; gap: 0.3rem; }
+    .scene-legend i { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--blue); }
+    .scene-legend span:last-child i { background: var(--orange); }
+    .hero-specs { display: grid; grid-template-columns: repeat(2, 1fr); margin-top: clamp(3rem, 7vw, 6rem); border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); }
+    .spec { padding: 1.35rem 1rem; border-right: 1px solid var(--line); }
+    .spec:nth-child(2n) { border-right: 0; }
+    .spec:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+    .spec-value { display: block; margin-bottom: 0.25rem; color: var(--ink); font: 500 clamp(1.35rem, 3vw, 2rem)/1.2 var(--font-mono); letter-spacing: -0.04em; }
+    .spec-label { color: var(--muted); font-size: 0.72rem; }
+
+    .atlas-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+    .segmented { display: inline-flex; border: 1px solid var(--line-strong); background: var(--paper-raised); }
+    .segmented .button { border: 0; border-right: 1px solid var(--line-strong); background: transparent; box-shadow: none; }
+    .segmented .button:last-child { border-right: 0; }
+    .segmented .button:hover { transform: none; }
+    .segmented .button.active { background: var(--blue); color: var(--paper-raised); }
+    .atlas-layout { display: grid; border: 1px solid var(--line-strong); background: var(--paper-raised); }
+    .graph-panel { min-width: 0; border-bottom: 1px solid var(--line-strong); }
+    .graph-caption { display: flex; justify-content: space-between; gap: 1rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--line); color: var(--muted); font: 500 0.66rem/1.5 var(--font-mono); }
+    .graph-scroll { overflow-x: auto; scrollbar-color: var(--line-strong) var(--paper-deep); }
+    .graph-canvas { position: relative; min-width: 880px; height: 540px; background-image: linear-gradient(90deg, transparent 24.8%, var(--line) 25%, transparent 25.2%, transparent 49.8%, var(--line) 50%, transparent 50.2%, transparent 74.8%, var(--line) 75%, transparent 75.2%); }
+    .graph-canvas::before { content: "PREPARE                         TRANSFORM                         COMPUTE                         OUTPUT"; position: absolute; left: 3%; right: 3%; top: 1rem; color: var(--muted); font: 500 0.6rem/1 var(--font-mono); letter-spacing: 0.09em; white-space: pre; opacity: 0.85; }
+    .graph-edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .graph-edge { fill: none; stroke: var(--line-strong); stroke-width: 1.4; transition: stroke 200ms, opacity 200ms, stroke-width 200ms; }
+    .graph-edge.is-active { stroke: var(--orange); stroke-width: 2.5; }
+    .graph-edge.is-muted { opacity: 0.22; }
+    .graph-canvas.is-flowing .graph-edge.is-active { stroke-dasharray: 7 8; animation: dash-flow 900ms linear infinite; }
+    .flow-particle { fill: var(--orange); opacity: 0; }
+    .graph-canvas.is-flowing .flow-particle.is-active { opacity: 1; }
+    @keyframes dash-flow { to { stroke-dashoffset: -30; } }
+    .module-node {
+      position: absolute;
+      width: 8.8rem;
+      min-height: 5rem;
+      transform: translate(-50%, -50%);
+      padding: 0.7rem 0.8rem;
+      border: 1px solid var(--line-strong);
+      border-radius: 2px;
+      background: var(--paper-raised);
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 3px 3px 0 var(--paper-deep);
+      transition: transform 180ms var(--ease-out), border-color 180ms, background-color 180ms, box-shadow 180ms;
+    }
+    .module-node:hover { transform: translate(-50%, calc(-50% - 3px)); border-color: var(--blue); box-shadow: 4px 5px 0 var(--blue-soft); }
+    .module-node.active { border: 2px solid var(--orange); background: var(--orange-soft); box-shadow: 5px 5px 0 var(--orange); }
+    .node-number { display: block; color: var(--blue); font: 600 0.62rem/1 var(--font-mono); margin-bottom: 0.55rem; }
+    .module-node.active .node-number { color: var(--orange-dark); }
+    .node-title { display: block; font-size: 0.82rem; font-weight: 700; line-height: 1.35; }
+    .node-en { display: block; margin-top: 0.25rem; color: var(--muted); font: 400 0.58rem/1.3 var(--font-mono); }
+    .module-detail { padding: clamp(1.5rem, 3vw, 2.25rem); background: var(--paper); }
+    .detail-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+    .detail-id { color: var(--orange-dark); font: 600 0.7rem/1 var(--font-mono); letter-spacing: 0.1em; }
+    .module-detail h3 { margin-bottom: 0.85rem; font: 900 clamp(1.55rem, 3vw, 2.25rem)/1.3 var(--font-display); }
+    .detail-role { color: var(--ink-soft); font-size: 0.92rem; }
+    .io-pair { display: grid; gap: 1rem; margin-block: 1.5rem; padding-block: 1.25rem; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .io-label { display: block; margin-bottom: 0.35rem; color: var(--blue); font: 600 0.62rem/1.4 var(--font-mono); letter-spacing: 0.1em; }
+    .io-pair p { margin: 0; font-size: 0.8rem; line-height: 1.7; }
+    .detail-block { margin-top: 1.4rem; }
+    .detail-block h4 { margin: 0 0 0.55rem; font-size: 0.78rem; letter-spacing: 0.06em; }
+    .detail-block p, .detail-block li { color: var(--ink-soft); font-size: 0.8rem; line-height: 1.8; }
+    .detail-block p { margin-bottom: 0; }
+    .detail-block ul { margin: 0; padding: 0; list-style: none; }
+    .detail-block li { position: relative; padding-left: 1rem; }
+    .detail-block li::before { content: "→"; position: absolute; left: 0; color: var(--orange-dark); font-family: var(--font-mono); }
+    .detail-block.llm { padding: 1rem; background: var(--blue-soft); border-left: 2px solid var(--blue); }
+    .detail-action { margin-top: 1.5rem; width: 100%; }
+
+    .source-section { background: var(--paper-deep); }
+    .source-shell { border: 1px solid var(--line-strong); background: var(--paper-raised); }
+    .source-layout { display: grid; min-width: 0; }
+    .source-sidebar { min-width: 0; border-bottom: 1px solid var(--line-strong); }
+    .search-wrap { padding: 1rem; border-bottom: 1px solid var(--line); }
+    .search-wrap label { display: block; margin-bottom: 0.5rem; color: var(--muted); font: 500 0.65rem/1 var(--font-mono); letter-spacing: 0.08em; }
+    .search-field { position: relative; }
+    .search-field input { width: 100%; min-height: 2.75rem; padding: 0.6rem 2.5rem 0.6rem 0.75rem; border: 1px solid var(--line-strong); border-radius: 2px; background: var(--paper); color: var(--ink); font-size: 0.8rem; }
+    .search-field input::placeholder { color: var(--muted); }
+    .search-key { position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); padding: 0.1rem 0.35rem; border: 1px solid var(--line); color: var(--muted); font: 500 0.62rem/1.4 var(--font-mono); pointer-events: none; }
+    .source-module-list { display: flex; overflow-x: auto; padding: 0.5rem; }
+    .source-module-button {
+      flex: 0 0 auto;
+      min-width: 8.5rem;
+      min-height: 3.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.75rem;
+      border: 0;
+      border-right: 1px solid var(--line);
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 150ms, color 150ms;
+    }
+    .source-module-button:hover { background: var(--blue-soft); }
+    .source-module-button.active { background: var(--ink); color: var(--paper); }
+    .source-module-button .num { color: var(--blue); font: 500 0.65rem/1 var(--font-mono); }
+    .source-module-button.active .num { color: var(--orange); }
+    .source-module-button .name { display: block; font-size: 0.76rem; font-weight: 600; white-space: nowrap; }
+    .source-module-button .cells { display: block; margin-top: 0.25rem; color: var(--muted); font: 400 0.58rem/1 var(--font-mono); }
+    .source-module-button.active .cells { color: var(--line); }
+    .source-empty { display: none; padding: 1.5rem; color: var(--muted); font-size: 0.8rem; }
+    .code-panel { min-width: 0; border-bottom: 1px solid var(--line-strong); }
+    .code-topbar { min-height: 3.4rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.6rem 1rem; border-bottom: 1px solid var(--line); }
+    .file-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font: 400 0.65rem/1.4 var(--font-mono); }
+    .copy-button { flex: 0 0 auto; }
+    .cell-tabs { display: flex; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--paper); }
+    .cell-tab { flex: 0 0 auto; min-height: 2.75rem; padding: 0.55rem 0.9rem; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font: 500 0.66rem/1 var(--font-mono); }
+    .cell-tab.active { color: var(--orange-dark); background: var(--orange-soft); box-shadow: inset 0 -2px var(--orange); }
+    .code-scroll { max-height: 43rem; overflow: auto; background: var(--code-bg); scrollbar-color: var(--line-strong) var(--paper-deep); }
+    .code-block { margin: 0; padding: 1rem 0 1.5rem; min-width: max-content; font: 400 0.77rem/1.8 var(--font-mono); font-variant-ligatures: none; tab-size: 4; }
+    .code-line { display: flex; min-height: 1.38rem; padding-right: 1.5rem; }
+    .code-line:hover { background: var(--blue-soft); }
+    .line-number { flex: 0 0 3.5rem; padding-right: 1rem; color: var(--muted); text-align: right; user-select: none; }
+    .line-content { white-space: pre; color: var(--ink); }
+    .tok-comment { color: oklch(51% 0.07 155); }
+    .tok-string { color: oklch(48% 0.13 45); }
+    .tok-keyword { color: oklch(46% 0.14 285); font-weight: 600; }
+    .tok-number { color: oklch(46% 0.13 220); }
+    .tok-function { color: oklch(43% 0.11 230); }
+    .source-notes { padding: clamp(1.25rem, 3vw, 2rem); background: var(--paper); }
+    .source-notes h3 { margin-bottom: 0.4rem; font: 900 1.55rem/1.35 var(--font-display); }
+    .source-notes .shape { display: inline-block; margin: 0.65rem 0 1.25rem; color: var(--orange-dark); font: 500 0.7rem/1.6 var(--font-mono); }
+    .note-list { margin: 0; padding: 0; list-style: none; counter-reset: note; }
+    .note-list li { position: relative; padding: 1rem 0 1rem 2.25rem; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 0.8rem; line-height: 1.75; counter-increment: note; }
+    .note-list li::before { content: "0" counter(note); position: absolute; left: 0; top: 1.2rem; color: var(--blue); font: 500 0.65rem/1 var(--font-mono); }
+    .cell-prose { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.72rem; }
+
+    .tensor-controls { padding: 1.5rem 0; }
+    .control-group { margin-bottom: 1.75rem; }
+    .control-label { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.8rem; font-size: 0.8rem; font-weight: 600; }
+    .control-value { color: var(--orange-dark); font: 600 0.85rem/1 var(--font-mono); }
+    input[type="range"] { width: 100%; accent-color: var(--orange); cursor: pointer; }
+    .range-marks { display: flex; justify-content: space-between; color: var(--muted); font: 400 0.6rem/1 var(--font-mono); }
+    .feature-options { display: flex; gap: 0.5rem; }
+    .feature-options .button { flex: 1; }
+    .parameter-readout { margin: 2rem 0; padding-block: 1.25rem; border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); }
+    .parameter-readout span { display: block; color: var(--muted); font-size: 0.72rem; }
+    .parameter-readout strong { display: block; margin: 0.25rem 0; color: var(--ink); font: 500 2.5rem/1.2 var(--font-mono); letter-spacing: -0.06em; }
+    .parameter-formula { color: var(--blue); font: 400 0.63rem/1.6 var(--font-mono); overflow-wrap: anywhere; }
+    .tensor-board { position: relative; padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--line-strong); background: var(--paper-raised); overflow: hidden; }
+    .tensor-board::after { content: "FORWARD / NO GRAD"; position: absolute; right: 1rem; top: 1rem; color: var(--line-strong); font: 500 0.62rem/1 var(--font-mono); letter-spacing: 0.1em; }
+    .tensor-flow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-top: 2rem; }
+    .tensor-stage { position: relative; min-height: 7.5rem; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; border: 1px solid var(--line); background: var(--paper); transition: transform 250ms var(--ease-out), background-color 250ms, border-color 250ms; }
+    .tensor-stage.active { transform: translateY(-5px); border-color: var(--orange); background: var(--orange-soft); }
+    .tensor-stage.output { border-color: var(--blue); }
+    .stage-index { color: var(--muted); font: 500 0.6rem/1 var(--font-mono); }
+    .stage-name { margin-top: 0.6rem; font: 600 0.73rem/1.4 var(--font-mono); }
+    .stage-shape { margin-top: 0.75rem; color: var(--blue); font: 600 clamp(0.82rem, 2vw, 1rem)/1.3 var(--font-mono); }
+    .tensor-insight { margin: 1.25rem 0 0; padding-left: 1rem; border-left: 3px solid var(--orange); color: var(--ink-soft); font-size: 0.8rem; }
+
+    .loop-shell { display: grid; border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); }
+    .loop-steps { display: flex; overflow-x: auto; border-bottom: 1px solid var(--line-strong); }
+    .loop-step-button { flex: 0 0 10rem; min-height: 7rem; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; padding: 1rem; border: 0; border-right: 1px solid var(--line); background: var(--paper-raised); text-align: left; cursor: pointer; transition: background-color 180ms, color 180ms; }
+    .loop-step-button:hover { background: var(--blue-soft); }
+    .loop-step-button.active { background: var(--ink); color: var(--paper); }
+    .loop-step-button .step-num { color: var(--blue); font: 500 0.65rem/1 var(--font-mono); }
+    .loop-step-button.active .step-num { color: var(--orange); }
+    .loop-step-button .step-title { font-size: 0.82rem; font-weight: 600; }
+    .loop-detail { padding: clamp(1.5rem, 4vw, 3rem); background: var(--paper-raised); }
+    .loop-detail-head { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+    .loop-detail h3 { margin: 0.4rem 0 1rem; font: 900 clamp(1.8rem, 4vw, 3rem)/1.25 var(--font-display); }
+    .loop-big-number { color: var(--orange-soft); font: 600 clamp(4rem, 10vw, 7rem)/0.8 var(--font-mono); letter-spacing: -0.1em; }
+    .loop-code { margin: 1.5rem 0; padding: 1.25rem; border-left: 3px solid var(--orange); background: var(--code-bg); overflow-x: auto; color: var(--blue); font: 500 0.82rem/1.8 var(--font-mono); white-space: pre; }
+    .loop-explain { max-width: 58ch; color: var(--ink-soft); }
+    .loop-io { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 1.5rem; color: var(--muted); font: 400 0.68rem/1.6 var(--font-mono); }
+    .loop-controls { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 1.5rem; }
+    .loop-warning { margin: 1.25rem 0 0; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.74rem; }
+
+    .comparison-intro { display: grid; gap: 1.5rem; margin-bottom: 2.5rem; }
+    .comparison-statement { max-width: 32ch; margin: 0; font: 700 clamp(1.25rem, 3vw, 1.8rem)/1.6 var(--font-display); }
+    .comparison-statement em { color: var(--orange-dark); font-style: normal; }
+    .comparison-intro p { max-width: 58ch; margin: 0; color: var(--ink-soft); }
+    .comparison-table-wrap { border-top: 2px solid var(--ink); }
+    .comparison-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .comparison-table th { padding: 1rem; border-bottom: 1px solid var(--line-strong); color: var(--muted); text-align: left; font: 600 0.66rem/1.4 var(--font-mono); letter-spacing: 0.08em; }
+    .comparison-table td { padding: 1.25rem 1rem; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 0.8rem; line-height: 1.75; }
+    .comparison-table td:first-child { font-weight: 700; }
+    .comparison-table td:nth-child(2) { color: var(--blue); font-family: var(--font-mono); font-size: 0.72rem; }
+    .comparison-table tr { transition: background-color 150ms; }
+    .comparison-table tbody tr:hover { background: var(--paper-raised); }
+    .comparison-table .tag { margin-top: 0.5rem; }
+    .takeaway { display: grid; gap: 1rem; margin-top: 3rem; padding: 1.5rem; border: 1px solid var(--orange); background: var(--orange-soft); }
+    .takeaway strong { font: 900 1.25rem/1.5 var(--font-display); }
+    .takeaway span { color: var(--ink-soft); font-size: 0.85rem; }
+
+    .site-footer { padding-block: 2.5rem; border-top: 1px solid var(--line-strong); background: var(--ink); color: var(--paper); }
+    .footer-inner { display: grid; gap: 1.5rem; }
+    .footer-title { font: 700 1rem/1.4 var(--font-display); }
+    .footer-path { color: var(--line); font: 400 0.65rem/1.7 var(--font-mono); overflow-wrap: anywhere; }
+    .footer-note { max-width: 46ch; color: var(--line); font-size: 0.72rem; }
+    .toast { position: fixed; z-index: 600; left: 50%; bottom: 1.5rem; transform: translate(-50%, 150%); padding: 0.75rem 1rem; border: 1px solid var(--orange); background: var(--ink); color: var(--paper); font-size: 0.78rem; opacity: 0; transition: transform 250ms var(--ease-out), opacity 250ms; pointer-events: none; }
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+    [data-reveal] { opacity: 0; transform: translateY(18px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
+    [data-reveal].revealed { opacity: 1; transform: translateY(0); }
+
+    @media (min-width: 40rem) {
+      .hero-specs { grid-template-columns: repeat(4, 1fr); }
+      .spec { border-right: 1px solid var(--line) !important; border-bottom: 0 !important; }
+      .spec:last-child { border-right: 0 !important; }
+      .io-pair { grid-template-columns: 1fr 1fr; }
+      .tensor-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .takeaway { grid-template-columns: minmax(12rem, 0.5fr) 1fr; align-items: center; }
+      .footer-inner { grid-template-columns: 1fr 1fr; align-items: end; }
+      .footer-note { justify-self: end; text-align: right; }
+    }
+    @media (min-width: 48rem) {
+      .main-nav { display: flex; }
+      .section-head { grid-template-columns: minmax(0, 1.3fr) minmax(18rem, 0.7fr); }
+      .section-desc { justify-self: end; }
+      .comparison-intro { grid-template-columns: 1fr 1fr; align-items: start; }
+      .comparison-intro p { justify-self: end; }
+    }
+    @media (min-width: 64rem) {
+      .hero-grid { grid-template-columns: minmax(0, 1.02fr) minmax(26rem, 0.98fr); gap: clamp(2rem, 5vw, 5rem); }
+      .scene-frame { min-height: 34rem; }
+      .atlas-layout { grid-template-columns: minmax(0, 1fr) 21rem; }
+      .graph-panel { border-bottom: 0; border-right: 1px solid var(--line-strong); }
+      .module-detail { max-height: 39rem; overflow-y: auto; }
+      .source-layout { grid-template-columns: 13rem minmax(0, 1fr); }
+      .source-sidebar { border-bottom: 0; border-right: 1px solid var(--line-strong); }
+      .source-module-list { display: block; padding: 0; overflow: visible; }
+      .source-module-button { width: 100%; min-width: 0; min-height: 4rem; border-right: 0; border-bottom: 1px solid var(--line); }
+      .code-panel { border-bottom: 0; }
+      .tensor-layout { display: grid; grid-template-columns: 18rem minmax(0, 1fr); gap: clamp(2rem, 5vw, 5rem); align-items: center; }
+      .tensor-flow { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.5rem; }
+      .tensor-stage { min-height: 10rem; padding: 0.8rem; }
+      .tensor-stage:not(:last-child)::after { content: "→"; position: absolute; right: -0.65rem; top: 50%; z-index: 2; transform: translate(50%, -50%); color: var(--orange-dark); font-family: var(--font-mono); }
+      .loop-shell { grid-template-columns: 15rem minmax(0, 1fr); }
+      .loop-steps { display: block; overflow: visible; border-bottom: 0; border-right: 1px solid var(--line-strong); }
+      .loop-step-button { width: 100%; min-height: 5.3rem; border-right: 0; border-bottom: 1px solid var(--line); }
+    }
+    @media (min-width: 80rem) {
+      .source-layout { grid-template-columns: 13rem minmax(0, 1fr) 18rem; }
+      .code-panel { border-right: 1px solid var(--line-strong); }
+    }
+    @media (max-width: 43.75rem) {
+      .comparison-table thead { display: none; }
+      .comparison-table, .comparison-table tbody, .comparison-table tr, .comparison-table td { display: block; width: 100%; }
+      .comparison-table tr { padding: 1rem 0; border-bottom: 1px solid var(--line-strong); }
+      .comparison-table td { padding: 0.45rem 0; border: 0; }
+      .comparison-table td::before { content: attr(data-label); display: block; margin-bottom: 0.2rem; color: var(--muted); font: 500 0.6rem/1.4 var(--font-mono); letter-spacing: 0.06em; }
+      .header-progress { display: none; }
+      .hero-kicker { align-items: flex-start; flex-direction: column; }
+      .scene-frame { min-height: 24rem; }
+      .scene-legend { display: none; }
+    }
+    @media (pointer: coarse) {
+      .module-node, .cell-tab, .source-module-button { min-height: 3.25rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      [data-reveal] { opacity: 1; transform: none; }
+      .flow-particle { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <div class="reading-progress" aria-hidden="true"><span id="progress-bar"></span></div>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="#overview" aria-label="Notebook Atlas 首页">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="brand-name">NOTEBOOK / ATLAS<small>CODE READING INSTRUMENT</small></span>
+      </a>
+      <nav class="main-nav" aria-label="页面导航">
+        <a href="#atlas">模块图谱</a>
+        <a href="#source">源码剖面</a>
+        <a href="#tensor">张量实验</a>
+        <a href="#training">训练循环</a>
+        <a href="#llm">LLM 对照</a>
+      </nav>
+      <span class="header-progress"><span id="progress-text">000</span>% READ</span>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="hero" id="overview" data-section="overview">
+      <div class="container">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <div class="hero-kicker">
+              <span class="tag orange">ML2023 · HW01</span>
+              <span class="eyebrow">Interactive code dissection / 001</span>
+            </div>
+            <h1>把训练代码，<br><em>读成一套系统。</em></h1>
+            <p class="hero-lead">不再从第一行顺读到最后一行。沿着数据、函数与张量三条线索，拆解这份 PyTorch notebook 的职责边界、调用顺序与设计取舍。</p>
+            <div class="hero-actions">
+              <a class="button primary" href="#atlas">进入模块图谱 <span class="icon-arrow">↘</span></a>
+              <a class="button" href="#training">先看训练循环 <span class="icon-arrow">→</span></a>
+            </div>
+            <p class="hero-note"><strong>先澄清：这不是 LLM。</strong>它是 COVID-19 表格数据上的三层 MLP 回归。真正可迁移的是“数据 → 模型 → 损失 → 反向传播 → 验证 → 推理”的训练骨架，而不是网络结构本身。</p>
+          </div>
+          <div class="scene-frame" aria-label="可旋转的三维模块关系图">
+            <div class="scene-meta"><span>MODULE SPACE / X:Y:Z</span><span>09 NODES · 12 LINKS</span></div>
+            <div id="neural-scene" role="img" aria-label="九个代码模块组成的三维蓝图，拖动可旋转，点击节点可查看模块"></div>
+            <div class="scene-footer">
+              <span class="scene-instruction">DRAG TO ROTATE<br>CLICK NODE TO INSPECT</span>
+              <div class="scene-legend"><span><i></i>数据 / 控制</span><span><i></i>当前模块</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="hero-specs" aria-label="Notebook 概览数据">
+          <div class="spec"><span class="spec-value">14</span><span class="spec-label">代码单元 / 全量保留</span></div>
+          <div class="spec"><span class="spec-value">09</span><span class="spec-label">职责模块 / 重新组织</span></div>
+          <div class="spec"><span class="spec-value">3009</span><span class="spec-label">训练样本 / 原始规模</span></div>
+          <div class="spec"><span class="spec-value">88→1</span><span class="spec-label">特征维度 / 回归输出</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="atlas" data-section="atlas">
+      <div class="container">
+        <div class="section-head" data-reveal>
+          <div><div class="section-index">01 / System map</div><h2 class="section-title">一张图，看清九个模块</h2></div>
+          <p class="section-desc">“数据流”回答值从哪里来、到哪里去；“函数调用”回答谁触发谁。点击节点，右侧同步显示职责、输入输出与设计原因。</p>
+        </div>
+        <div class="atlas-toolbar" data-reveal>
+          <div class="segmented" role="tablist" aria-label="图谱模式">
+            <button class="button small active" id="view-data" role="tab" aria-selected="true" data-view="data">数据流</button>
+            <button class="button small" id="view-calls" role="tab" aria-selected="false" data-view="calls">函数调用</button>
+          </div>
+          <button class="button small" id="flow-toggle" aria-pressed="false"><span aria-hidden="true">▶</span> 播放数据流</button>
+        </div>
+        <div class="atlas-layout" data-reveal>
+          <div class="graph-panel">
+            <div class="graph-caption"><span id="graph-mode-label">DATA DEPENDENCY / 数据依赖</span><span>CLICK TO INSPECT</span></div>
+            <div class="graph-scroll">
+              <div class="graph-canvas" id="module-graph">
+                <svg class="graph-edges" id="graph-edges" aria-hidden="true">
+                  <defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="context-stroke"></path></marker></defs>
+                  <g id="edge-paths"></g><g id="edge-particles"></g>
+                </svg>
+                <div id="graph-nodes"></div>
+              </div>
+            </div>
+          </div>
+          <aside class="module-detail" id="module-detail" aria-live="polite"></aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section source-section" id="source" data-section="source">
+      <div class="container">
+        <div class="section-head" data-reveal>
+          <div><div class="section-index">02 / Source lens</div><h2 class="section-title">每一段源码，都有位置</h2></div>
+          <p class="section-desc">左侧按职责切换模块，顶部切换原始 cell。代码保持 notebook 原貌；右侧只补充理解它所需的关键观察。</p>
+        </div>
+        <div class="source-shell" data-reveal>
+          <div class="source-layout">
+            <aside class="source-sidebar">
+              <div class="search-wrap">
+                <label for="module-search">SEARCH MODULE OR CODE</label>
+                <div class="search-field"><input id="module-search" type="search" placeholder="例如 backward" autocomplete="off"><span class="search-key">/</span></div>
+              </div>
+              <div class="source-module-list" id="source-module-list"></div>
+              <div class="source-empty" id="source-empty">没有匹配模块。可尝试函数名、类名或“训练”。</div>
+            </aside>
+            <div class="code-panel">
+              <div class="code-topbar">
+                <span class="file-path">ml2023spring-hw1-v1.ipynb / <span id="current-cell-label">cell-14</span></span>
+                <button class="button small copy-button" id="copy-code">复制代码</button>
+              </div>
+              <div class="cell-tabs" id="cell-tabs" role="tablist" aria-label="代码单元"></div>
+              <div class="code-scroll"><pre class="code-block"><code id="code-content"></code></pre></div>
+            </div>
+            <aside class="source-notes" id="source-notes" aria-live="polite"></aside>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="tensor" data-section="tensor">
+      <div class="container">
+        <div class="section-head" data-reveal>
+          <div><div class="section-index">03 / Tensor lab</div><h2 class="section-title">让形状变化，看得见</h2></div>
+          <p class="section-desc">调整 batch size 与特征列，观察每一层输入输出。注意：batch size 改变激活张量，不会改变模型参数量。</p>
+        </div>
+        <div class="tensor-layout" data-reveal>
+          <div class="tensor-controls">
+            <div class="control-group">
+              <label class="control-label" for="batch-slider"><span>Batch size / B</span><output class="control-value" id="batch-value">256</output></label>
+              <input id="batch-slider" type="range" min="1" max="512" value="256" step="1">
+              <div class="range-marks"><span>1</span><span>512</span></div>
+            </div>
+            <div class="control-group">
+              <span class="control-label">输入特征 / F</span>
+              <div class="feature-options" role="group" aria-label="输入特征数">
+                <button class="button small active" data-features="88" aria-pressed="true">全部 88</button>
+                <button class="button small" data-features="53" aria-pressed="false">筛选 53</button>
+              </div>
+            </div>
+            <div class="parameter-readout">
+              <span>可训练参数 / PARAMETERS</span><strong id="parameter-count">1,569</strong>
+              <div class="parameter-formula" id="parameter-formula">88×16+16 + 16×8+8 + 8×1+1</div>
+            </div>
+            <button class="button primary" id="run-forward">运行一次前向传播 <span class="icon-arrow">→</span></button>
+          </div>
+          <div class="tensor-board">
+            <div class="eyebrow">MY_MODEL.FORWARD(X)</div>
+            <div class="tensor-flow" id="tensor-flow"></div>
+            <p class="tensor-insight"><strong>最关键的一行是 <span class="mono">squeeze(1)</span>：</strong>它把 <span class="mono">[B,1]</span> 变为 <span class="mono">[B]</span>，与标签对齐，避免 MSE 计算时发生意外广播。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="training" data-section="training">
+      <div class="container">
+        <div class="section-head" data-reveal>
+          <div><div class="section-index">04 / Training loop</div><h2 class="section-title">把 trainer 拆成七次呼吸</h2></div>
+          <p class="section-desc">训练循环的核心不是语法，而是状态顺序。逐步执行，观察梯度、计算图、参数与验证模式在每一步如何变化。</p>
+        </div>
+        <div class="loop-shell" data-reveal>
+          <div class="loop-steps" id="loop-steps" role="tablist" aria-label="训练循环步骤"></div>
+          <div class="loop-detail" id="loop-detail" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="llm" data-section="llm">
+      <div class="container">
+        <div class="section-head" data-reveal>
+          <div><div class="section-index">05 / Transfer to LLM</div><h2 class="section-title">骨架相同，内部结构不同</h2></div>
+          <p class="section-desc">不要用“MLP 很小，所以与 LLM 无关”来理解这份代码。更有效的问法是：哪些训练机制原样保留，哪些组件必须替换？</p>
+        </div>
+        <div class="comparison-intro" data-reveal>
+          <p class="comparison-statement">先掌握<em>闭环</em>，再替换组件。<br>规模变化，不会让训练的基本原则失效。</p>
+          <p>从这份 notebook 迁移到 LLM 时，损失函数、网络结构与数据表示发生根本变化；而可复现、训练/验证隔离、最佳 checkpoint 与早停等工程原则仍然成立。</p>
+        </div>
+        <div class="comparison-table-wrap" data-reveal>
+          <table class="comparison-table">
+            <thead><tr><th style="width:16%">训练骨架</th><th style="width:23%">这份 Notebook</th><th style="width:27%">LLM 中的对应物</th><th>为什么变化</th></tr></thead>
+            <tbody>
+              <tr><td data-label="训练骨架">样本抽象<span class="tag">接口保留</span></td><td data-label="这份 Notebook">COVID19Dataset<br>返回 x, y</td><td data-label="LLM 中的对应物">TokenDataset 返回 input_ids、attention_mask、labels</td><td data-label="为什么变化">语言模型处理变长 token 序列，需要掩码与位移标签。</td></tr>
+              <tr><td data-label="训练骨架">数据变换<span class="tag orange">需要替换</span></td><td data-label="这份 Notebook">select_feat<br>手工选择表格列</td><td data-label="LLM 中的对应物">Tokenizer、packing、truncation、DistributedSampler</td><td data-label="为什么变化">文本不是固定列；预训练更关注 token 化、序列拼接与多卡切分。</td></tr>
+              <tr><td data-label="训练骨架">模型前向<span class="tag orange">结构替换</span></td><td data-label="这份 Notebook">Linear → ReLU → Linear<br>[B,88] → [B]</td><td data-label="LLM 中的对应物">Embedding + Transformer blocks + LM head</td><td data-label="为什么变化">MLP 拟合表格映射；Transformer 建模序列上下文并输出词表 logits。</td></tr>
+              <tr><td data-label="训练骨架">损失函数<span class="tag orange">目标替换</span></td><td data-label="这份 Notebook">MSELoss<br>连续值回归</td><td data-label="LLM 中的对应物">CrossEntropyLoss<br>next-token prediction</td><td data-label="为什么变化">回归拟合数值；语言建模是在词表类别上预测下一个 token。</td></tr>
+              <tr><td data-label="训练骨架">参数优化<span class="tag">闭环保留</span></td><td data-label="这份 Notebook">SGD + momentum<br>zero_grad / backward / step</td><td data-label="LLM 中的对应物">AdamW + scheduler + grad clip + accumulation</td><td data-label="为什么变化">三步闭环不变；大模型需要更稳定、更节省显存的优化策略。</td></tr>
+              <tr><td data-label="训练骨架">验证与保存<span class="tag">原则保留</span></td><td data-label="这份 Notebook">eval / no_grad<br>best_loss / early_stop</td><td data-label="LLM 中的对应物">validation perplexity、checkpoint、resume</td><td data-label="为什么变化">验证不参与反向传播、保存最佳状态的原则完全一致。</td></tr>
+              <tr><td data-label="训练骨架">推理导出<span class="tag">流程扩展</span></td><td data-label="这份 Notebook">predict → pred.csv</td><td data-label="LLM 中的对应物">generate → sampling → tokenizer.decode</td><td data-label="为什么变化">从一次性数值预测扩展为自回归、多步 token 生成。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="takeaway" data-reveal><strong>建议阅读顺序</strong><span>先看 config 与 cell 22 建立全局，再读 My_Model 明确形状，接着逐行拆解 trainer，最后回到 predict 闭环。按依赖阅读，比按 cell 顺序阅读更容易形成系统心智模型。</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div><div class="footer-title">NOTEBOOK / ATLAS</div><div class="footer-path">SOURCE: ML2023 Spring/HW01/code/ml2023spring-hw1-v1.ipynb</div></div>
+      <div class="footer-note">源码来自原 notebook；解释与图示为学习辅助。训练曲线未使用伪造数据，张量与样本数量均由原代码推得。</div>
+    </div>
+  </footer>
+  <div class="toast" id="toast" role="status" aria-live="polite">代码已复制</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+  <script>
+    const modules = [
+      {
+        id: "setup", number: "01", title: "环境与原始数据", en: "SETUP / RAW DATA", phase: "prepare", x: 11, y: 22,
+        role: "准备计算环境、依赖与 CSV 原始数据，并用 describe() 做第一轮数据体检。",
+        input: "covid_train.csv、covid_test.csv；CUDA 与 Python 运行环境。",
+        output: "Pandas DataFrame，以及可用的 NumPy / PyTorch 环境。",
+        why: "把环境检查、数据下载和依赖导入集中前置，可以优先暴露 GPU、依赖或文件缺失问题，避免训练运行到中途才失败。",
+        calls: ["nvidia-smi → 检查 GPU", "pd.read_csv → 载入表格", "df.describe → 汇总统计"],
+        llm: "对应训练环境检查、依赖安装与语料元信息检查；LLM 还会额外关注 tokenizer、语料格式与分布式环境。",
+        shape: "train [3009,89] / test [997,88]",
+        insights: ["cell 2 与 cell 5 是 notebook shell 命令，不是 Python 语句。", "训练集 89 列包含目标值；测试集 88 列没有目标值。", "describe() 只做统计概览，不参与后续训练计算。"],
+        cells: [
+          { id: 2, title: "检查 GPU", code: String.raw`!nvidia-smi` },
+          { id: 5, title: "下载数据", code: String.raw`# google drive link
+!pip install gdown
+!gdown --id '1BjXalPZxq9mybPKNjF3h5L3NcF7XKTS-' --output covid_train.csv
+!gdown --id '1B55t74Jg2E5FCsKCsUEkPKIuqaY7UIi1' --output covid_test.csv
+
+# dropbox link
+# !wget -O covid_train.csv https://www.dropbox.com/s/lmy1riadzoy0ahw/covid.train.csv?dl=0
+# !wget -O covid_test.csv https://www.dropbox.com/s/zalbw42lu4nmhr2/covid.test.csv?dl=0` },
+          { id: 6, title: "导入依赖", code: String.raw`# Numerical Operations
+import math
+import numpy as np
+
+# Reading/Writing Data
+import pandas as pd
+import os
+import csv
+
+# For Progress Bar
+from tqdm import tqdm
+
+# Pytorch
+import torch 
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader, random_split
+
+# For plotting learning curve
+from torch.utils.tensorboard import SummaryWriter` },
+          { id: 8, title: "数据概览", code: String.raw`df = pd.read_csv('./covid_train.csv')
+df.describe()` }
+        ]
+      },
+      {
+        id: "utils", number: "02", title: "可复现与工具函数", en: "UTILITIES", phase: "prepare", x: 11, y: 52,
+        role: "提供随机种子、训练/验证切分与批量推理三个通用函数。",
+        input: "原始数组、划分比例、模型与 DataLoader。",
+        output: "可复现实验、train/valid 数组，以及 NumPy 预测结果。",
+        why: "把跨流程复用逻辑从主脚本抽离，减少重复；random_split 使用独立 generator，让数据划分也能被种子精确复现。",
+        calls: ["same_seed ← 数据装配前", "train_valid_split ← 特征选择前", "predict ← 加载最佳模型后"],
+        llm: "同样用于固定数据顺序、创建验证集和批量推理；生成任务还需要 sampling 参数与解码策略。",
+        shape: "3009 → train 2408 / valid 601",
+        insights: ["same_seed 同时设置 NumPy、CPU 与所有 CUDA 设备的随机状态。", "train_valid_split 返回 NumPy 数组，而不是 Subset 对象。", "predict 使用 eval + no_grad，并将每批结果移到 CPU 后拼接。"],
+        cells: [
+          { id: 10, title: "通用函数", code: String.raw`def same_seed(seed): 
+    '''Fixes random number generator seeds for reproducibility.'''
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+def train_valid_split(data_set, valid_ratio, seed):
+    '''Split provided training data into training set and validation set'''
+    valid_set_size = int(valid_ratio * len(data_set)) 
+    train_set_size = len(data_set) - valid_set_size
+    train_set, valid_set = random_split(data_set, [train_set_size, valid_set_size], generator=torch.Generator().manual_seed(seed))
+    return np.array(train_set), np.array(valid_set)
+
+def predict(test_loader, model, device):
+    model.eval() # Set your model to evaluation mode.
+    preds = []
+    for x in tqdm(test_loader):
+        x = x.to(device)                        
+        with torch.no_grad():                   
+            pred = model(x)                     
+            preds.append(pred.detach().cpu())   
+    preds = torch.cat(preds, dim=0).numpy()  
+    return preds` }
+        ]
+      },
+      {
+        id: "config", number: "03", title: "超参数配置中心", en: "CONFIGURATION", phase: "prepare", x: 11, y: 82,
+        role: "集中声明设备与全部超参数，作为实验的控制面板。",
+        input: "手工实验配置，以及 torch.cuda.is_available()。",
+        output: "device 字符串与 config 字典。",
+        why: "把实验变量与算法实现解耦，便于复现和比较不同实验，避免 learning rate、batch size 等魔法数散落在函数内部。",
+        calls: ["config → 数据切分与 DataLoader", "config → trainer", "save_path → 最佳模型与推理"],
+        llm: "对应训练 YAML 或 dataclass：lr、batch、max_steps、warmup、weight_decay、precision、checkpoint 等。",
+        shape: "B=256 · lr=1e-5 · epochs≤5000",
+        insights: ["early_stop=600 是连续未改善的 epoch 上限，不是 batch 数。", "device 只选择设备；每个 batch 和模型都必须显式迁移到同一设备。", "seed 同时传入 same_seed 与 train_valid_split，分别控制随机状态和样本划分。"],
+        cells: [
+          { id: 20, title: "实验配置", code: String.raw`device = 'cuda' if torch.cuda.is_available() else 'cpu'
+config = {
+    'seed': 5201314,      # Your seed number, you can pick your lucky number. :)
+    'select_all': True,   # Whether to use all features.
+    'valid_ratio': 0.2,   # validation_size = train_size * valid_ratio
+    'n_epochs': 5000,     # Number of epochs.            
+    'batch_size': 256, 
+    'learning_rate': 1e-5,              
+    'early_stop': 600,    # If model has not improved for this many consecutive epochs, stop training.     
+    'save_path': './models/model.ckpt'  # Your model will be saved here.
+}` }
+        ]
+      },
+      {
+        id: "features", number: "04", title: "特征与标签分离", en: "FEATURE SELECTION", phase: "transform", x: 37, y: 22,
+        role: "拆分特征与回归目标，并按列索引选择输入变量。",
+        input: "train/valid [N,89]、test [N,88] 与 select_all。",
+        output: "三个特征矩阵 [N,F]，以及 y_train、y_valid [N]。",
+        why: "训练集最后一列是目标值，必须先与输入分离，避免目标泄漏。列选择让特征消融实验不必改动模型和训练循环。",
+        calls: ["select_feat ← 原始数据切分后", "feat_idx → 三套特征矩阵", "select_all=False → 选择第 35 列起"],
+        llm: "它不是 tokenizer，更像传统特征工程。LLM 通常用 tokenizer 与 packing 取代手工列选择。",
+        shape: "F=88（select_all=True）",
+        insights: ["train_data[:,-1] 是标签，train_data[:,:-1] 是特征。", "测试集没有最后一列标签，因此直接使用整个 test_data。", "select_all=False 保留索引 35 到 87，共 53 个特征。"],
+        cells: [
+          { id: 16, title: "特征选择", code: String.raw`def select_feat(train_data, valid_data, test_data, select_all=True):
+    '''Selects useful features to perform regression'''
+    y_train, y_valid = train_data[:,-1], valid_data[:,-1]
+    raw_x_train, raw_x_valid, raw_x_test = train_data[:,:-1], valid_data[:,:-1], test_data
+
+    if select_all:
+        feat_idx = list(range(raw_x_train.shape[1]))
+    else:
+        feat_idx = list(range(35, raw_x_train.shape[1])) # TODO: Select suitable feature columns.
+        
+    return raw_x_train[:,feat_idx], raw_x_valid[:,feat_idx], raw_x_test[:,feat_idx], y_train, y_valid` }
+        ]
+      },
+      {
+        id: "dataset", number: "05", title: "Dataset 样本抽象", en: "DATASET ADAPTER", phase: "transform", x: 37, y: 52,
+        role: "把 NumPy 特征和标签包装成 PyTorch 可按索引读取的样本集合。",
+        input: "x [N,F]；y [N] 或 None。",
+        output: "训练时返回 (x_i,y_i)，测试时只返回 x_i。",
+        why: "统一训练与测试的数据接口；y=None 让同一个类支持无标签推理，DataLoader 才能自动完成索引、批处理与堆叠。",
+        calls: ["COVID19Dataset ← 数据装配", "__getitem__ ← DataLoader 内部", "__len__ ← DataLoader 内部"],
+        llm: "对应 TokenDataset：返回 input_ids、labels、attention_mask；接口不变，但样本构造更复杂。",
+        shape: "x_i [F] · y_i scalar",
+        insights: ["__init__ 一次性把数组转为 FloatTensor，后续按索引读取。", "训练与测试返回值结构不同，因此训练 loader 解包为 x,y，测试 loader 只接收 x。", "__len__ 让 DataLoader 能计算 batch 数并控制迭代终止。"],
+        cells: [
+          { id: 12, title: "Dataset 类", code: String.raw`class COVID19Dataset(Dataset):
+    '''
+    x: Features.
+    y: Targets, if none, do prediction.
+    '''
+    def __init__(self, x, y=None):
+        if y is None:
+            self.y = y
+        else:
+            self.y = torch.FloatTensor(y)
+        self.x = torch.FloatTensor(x)
+
+    def __getitem__(self, idx):
+        if self.y is None:
+            return self.x[idx]
+        else:
+            return self.x[idx], self.y[idx]
+
+    def __len__(self):
+        return len(self.x)` }
+        ]
+      },
+      {
+        id: "pipeline", number: "06", title: "数据装配线", en: "DATA PIPELINE", phase: "transform", x: 37, y: 82,
+        role: "按固定顺序串起切分、特征选择、Dataset 与 DataLoader，形成训练输入。",
+        input: "CSV 数组与 config。",
+        output: "train/valid/test_loader，以及 x_train 等矩阵。",
+        why: "先切分再选择或预处理，是避免验证信息泄漏的关键顺序。训练集 shuffle 打破顺序，测试集保持顺序以对应提交 id。",
+        calls: ["same_seed → train_valid_split → select_feat", "Dataset → DataLoader", "train/valid_loader → trainer"],
+        llm: "对应完整 DataPipeline：语料读取 → tokenize → packing → DistributedSampler → DataLoader。",
+        shape: "train 10 batches · valid 3 · test 4",
+        insights: ["3009 条训练数据按 0.2 比例得到 2408 条训练与 601 条验证。", "pin_memory=True 为 CPU 到 GPU 的异步拷贝准备锁页内存。", "valid_loader 也 shuffle 不影响损失均值；test_loader 必须保持顺序。"],
+        cells: [
+          { id: 22, title: "构建数据管线", code: String.raw`# Set seed for reproducibility
+same_seed(config['seed'])
+
+
+# train_data size: 3009 x 89 (35 states + 18 features x 3 days) 
+# test_data size: 997 x 88 (without last day's positive rate)
+train_data, test_data = pd.read_csv('./covid_train.csv').values, pd.read_csv('./covid_test.csv').values
+train_data, valid_data = train_valid_split(train_data, config['valid_ratio'], config['seed'])
+
+# Print out the data size.
+print(f"""train_data size: {train_data.shape} 
+valid_data size: {valid_data.shape} 
+test_data size: {test_data.shape}""")
+
+# Select features
+x_train, x_valid, x_test, y_train, y_valid = select_feat(train_data, valid_data, test_data, config['select_all'])
+
+# Print out the number of features.
+print(f'number of features: {x_train.shape[1]}')
+
+train_dataset, valid_dataset, test_dataset = COVID19Dataset(x_train, y_train), \
+                                            COVID19Dataset(x_valid, y_valid), \
+                                            COVID19Dataset(x_test)
+
+# Pytorch data loader loads pytorch dataset into batches.
+train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
+valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
+test_loader = DataLoader(test_dataset, batch_size=config['batch_size'], shuffle=False, pin_memory=True)` }
+        ]
+      },
+      {
+        id: "model", number: "07", title: "MLP 回归模型", en: "MY_MODEL", phase: "compute", x: 64, y: 28,
+        role: "定义三层 MLP，把表格特征映射为一个感染率预测值。",
+        input: "input_dim=F；forward 接收 x [B,F]。",
+        output: "一维预测向量 [B]。",
+        why: "Sequential 足以清晰表达顺序网络；squeeze(1) 对齐 MSELoss 的 [B] 标签形状，避免意外广播成 [B,B]。",
+        calls: ["My_Model ← 训练入口与推理入口", "self.layers ← forward", "squeeze(1) → [B,1] 变 [B]"],
+        llm: "对应整个 Transformer 语言模型；LLM 通常输出 [B,T,V] 的 logits，而不是回归的 [B]。",
+        shape: "[B,88] → [B,16] → [B,8] → [B,1] → [B]",
+        insights: ["两次 ReLU 提供非线性；输出层不用激活，因为回归目标不受 [0,1] 限制。", "input_dim 来自 x_train.shape[1]，特征选择变化时无需手改第一层。", "模型本身只有 1,569 个参数（F=88），远小于 LLM，但 forward 接口一致。"],
+        cells: [
+          { id: 14, title: "模型定义", code: String.raw`class My_Model(nn.Module):
+    def __init__(self, input_dim):
+        super(My_Model, self).__init__()
+        # TODO: modify model's structure, be aware of dimensions. 
+        self.layers = nn.Sequential(
+            nn.Linear(input_dim, 16),
+            nn.ReLU(),
+            nn.Linear(16, 8),
+            nn.ReLU(),
+            nn.Linear(8, 1)
+        )
+
+    def forward(self, x):
+        x = self.layers(x)
+        x = x.squeeze(1) # (B, 1) -> (B)
+        return x` }
+        ]
+      },
+      {
+        id: "trainer", number: "08", title: "训练与验证引擎", en: "TRAINER", phase: "compute", x: 64, y: 72,
+        role: "执行训练、验证、日志、最佳模型保存与 early stopping。",
+        input: "train/valid_loader、model、config 与 device。",
+        output: "优化后的参数，以及 models/model.ckpt。",
+        why: "train/eval 与 no_grad 明确区分训练和验证；只保存验证损失最优的参数，early stopping 用来降低过拟合与无效计算。",
+        calls: ["model.train → forward → MSELoss", "zero_grad → backward → optimizer.step", "model.eval → valid → save / early stop"],
+        llm: "训练骨架几乎不变；LLM 常增加梯度裁剪、混合精度、学习率调度、梯度累积与分布式同步。",
+        shape: "pred [B] = y [B] · MSE → scalar",
+        insights: ["每个 batch 都执行 zero_grad，因为 PyTorch 默认累积梯度。", "验证阶段不调用 backward 或 optimizer.step，只计算损失。", "TensorBoard 以全局 step 记录 epoch 平均训练/验证损失。"],
+        cells: [
+          { id: 18, title: "trainer 函数", code: String.raw`def trainer(train_loader, valid_loader, model, config, device):
+
+    criterion = nn.MSELoss(reduction='mean') # Define your loss function, do not modify this.
+
+    # Define your optimization algorithm. 
+    # TODO: Please check https://pytorch.org/docs/stable/optim.html to get more available algorithms.
+    # TODO: L2 regularization (optimizer(weight decay...) or implement by your self).
+    optimizer = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=0.7) 
+    writer = SummaryWriter() # Writer of tensoboard.
+
+    if not os.path.isdir('./models'):
+        os.mkdir('./models') # Create directory of saving models.
+
+    n_epochs, best_loss, step, early_stop_count = config['n_epochs'], math.inf, 0, 0
+
+    for epoch in range(n_epochs):
+        model.train() # Set your model to train mode.
+        loss_record = []
+
+        # tqdm is a package to visualize your training progress.
+        train_pbar = tqdm(train_loader, position=0, leave=True)
+
+        for x, y in train_pbar:
+            optimizer.zero_grad()               # Set gradient to zero.
+            x, y = x.to(device), y.to(device)   # Move your data to device. 
+            pred = model(x)             
+            loss = criterion(pred, y)
+            loss.backward()                     # Compute gradient(backpropagation).
+            optimizer.step()                    # Update parameters.
+            step += 1
+            loss_record.append(loss.detach().item())
+            
+            # Display current epoch number and loss on tqdm progress bar.
+            train_pbar.set_description(f'Epoch [{epoch+1}/{n_epochs}]')
+            train_pbar.set_postfix({'loss': loss.detach().item()})
+
+        mean_train_loss = sum(loss_record)/len(loss_record)
+        writer.add_scalar('Loss/train', mean_train_loss, step)
+
+        model.eval() # Set your model to evaluation mode.
+        loss_record = []
+        for x, y in valid_loader:
+            x, y = x.to(device), y.to(device)
+            with torch.no_grad():
+                pred = model(x)
+                loss = criterion(pred, y)
+
+            loss_record.append(loss.item())
+            
+        mean_valid_loss = sum(loss_record)/len(loss_record)
+        print(f'Epoch [{epoch+1}/{n_epochs}]: Train loss: {mean_train_loss:.4f}, Valid loss: {mean_valid_loss:.4f}')
+        writer.add_scalar('Loss/valid', mean_valid_loss, step)
+
+        if mean_valid_loss < best_loss:
+            best_loss = mean_valid_loss
+            torch.save(model.state_dict(), config['save_path']) # Save your best model
+            print('Saving model with loss {:.3f}...'.format(best_loss))
+            early_stop_count = 0
+        else: 
+            early_stop_count += 1
+
+        if early_stop_count >= config['early_stop']:
+            print('\nModel is not improving, so we halt the training session.')
+            return` },
+          { id: 24, title: "启动训练", code: String.raw`model = My_Model(input_dim=x_train.shape[1]).to(device) # put your model and data on the same computation device.
+trainer(train_loader, valid_loader, model, config, device)` }
+        ]
+      },
+      {
+        id: "inference", number: "09", title: "最佳模型与推理", en: "INFERENCE / EXPORT", phase: "output", x: 88, y: 72,
+        role: "重新实例化模型、加载最佳参数、批量预测并保存提交文件。",
+        input: "model.ckpt、test_loader 与 input_dim。",
+        output: "preds [997] 与 pred.csv。",
+        why: "模型结构与加载参数必须一致；eval + no_grad 关闭训练行为并节省显存；测试集不打乱，保证预测与 id 对齐。",
+        calls: ["My_Model → load_state_dict", "predict → torch.cat → NumPy", "save_pred → pred.csv → FileLink"],
+        llm: "对应加载 checkpoint 后 generate/evaluate；生成任务还要 tokenizer.decode 与停止条件。",
+        shape: "[997,88] → batches → preds [997]",
+        insights: ["推理重新创建 My_Model，而不是沿用训练结束时的最后一组参数。", "torch.cat 将各 batch 沿第 0 维拼回完整预测。", "save_pred 用 enumerate 生成 id，因此测试顺序不能被打乱。"],
+        cells: [
+          { id: 26, title: "预测与保存", code: String.raw`def save_pred(preds, file):
+    ''' Save predictions to specified file '''
+    with open(file, 'w') as fp:
+        writer = csv.writer(fp)
+        writer.writerow(['id', 'tested_positive'])
+        for i, p in enumerate(preds):
+            writer.writerow([i, p])
+
+model = My_Model(input_dim=x_train.shape[1]).to(device)
+model.load_state_dict(torch.load(config['save_path']))
+preds = predict(test_loader, model, device) 
+save_pred(preds, 'pred.csv')         ` },
+          { id: 28, title: "下载预测文件", code: String.raw`from IPython.display import FileLink
+FileLink(r'pred.csv')` }
+        ]
+      }
+    ];
+
+    const graphViews = {
+      data: {
+        label: "DATA DEPENDENCY / 数据依赖",
+        edges: [["setup","features"],["features","dataset"],["dataset","pipeline"],["config","pipeline"],["utils","pipeline"],["pipeline","trainer"],["model","trainer"],["trainer","inference"],["pipeline","inference"],["utils","inference"],["config","trainer"],["config","inference"]]
+      },
+      calls: {
+        label: "CALL GRAPH / 调用方向：调用者 → 被调用者",
+        edges: [["pipeline","utils"],["pipeline","features"],["pipeline","dataset"],["trainer","model"],["inference","model"],["inference","utils"],["utils","model"]]
+      }
+    };
+
+    let selectedModuleId = "model";
+    let selectedCellByModule = {};
+    let graphMode = "data";
+    let flowPlaying = false;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const moduleById = id => modules.find(module => module.id === id);
+    const $ = selector => document.querySelector(selector);
+
+    function escapeHTML(value) {
+      return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function highlightPython(code) {
+      const pattern = /(#.*$)|("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|\b(def|class|return|if|else|elif|for|while|in|is|not|and|or|import|from|as|with|try|except|finally|raise|pass|break|continue|None|True|False|lambda|global|nonlocal|yield|assert|del)\b|\b(\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b|([A-Za-z_]\w*)(?=\()/g;
+      return code.split("\n").map(line => {
+        let output = "", last = 0, match;
+        pattern.lastIndex = 0;
+        while ((match = pattern.exec(line)) !== null) {
+          output += escapeHTML(line.slice(last, match.index));
+          const className = match[1] ? "tok-comment" : match[2] ? "tok-string" : match[3] ? "tok-keyword" : match[4] ? "tok-number" : "tok-function";
+          output += `<span class="${className}">${escapeHTML(match[0])}</span>`;
+          last = pattern.lastIndex;
+        }
+        output += escapeHTML(line.slice(last));
+        return output || " ";
+      });
+    }
+
+    function renderCode(code) {
+      return highlightPython(code).map((line, index) => `<span class="code-line"><span class="line-number">${String(index + 1).padStart(2, "0")}</span><span class="line-content">${line}</span></span>`).join("");
+    }
+
+    function renderGraphNodes() {
+      $("#graph-nodes").innerHTML = modules.map(module => `
+        <button class="module-node ${module.id === selectedModuleId ? "active" : ""}" data-module="${module.id}" style="left:${module.x}%;top:${module.y}%" aria-label="查看 ${module.title}">
+          <span class="node-number">M${module.number} / ${module.phase.toUpperCase()}</span>
+          <span class="node-title">${module.title}</span><span class="node-en">${module.en}</span>
+        </button>`).join("");
+      document.querySelectorAll(".module-node").forEach(button => button.addEventListener("click", () => selectModule(button.dataset.module)));
+      requestAnimationFrame(renderGraphEdges);
+    }
+
+    function renderGraphEdges() {
+      const graph = $("#module-graph");
+      const rect = graph.getBoundingClientRect();
+      const edgeGroup = $("#edge-paths");
+      const particleGroup = $("#edge-particles");
+      edgeGroup.innerHTML = "";
+      particleGroup.innerHTML = "";
+      const edges = graphViews[graphMode].edges;
+      edges.forEach(([fromId, toId], index) => {
+        const from = moduleById(fromId), to = moduleById(toId);
+        const x1 = from.x / 100 * rect.width, y1 = from.y / 100 * rect.height;
+        const x2 = to.x / 100 * rect.width, y2 = to.y / 100 * rect.height;
+        const bend = Math.max(35, Math.abs(x2 - x1) * 0.45);
+        const direction = x2 >= x1 ? 1 : -1;
+        const pathData = `M ${x1} ${y1} C ${x1 + bend * direction} ${y1}, ${x2 - bend * direction} ${y2}, ${x2} ${y2}`;
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", pathData);
+        path.setAttribute("class", "graph-edge");
+        path.setAttribute("marker-end", "url(#arrowhead)");
+        path.dataset.from = fromId;
+        path.dataset.to = toId;
+        edgeGroup.appendChild(path);
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("r", "3.5");
+        circle.setAttribute("class", "flow-particle");
+        circle.dataset.from = fromId;
+        circle.dataset.to = toId;
+        const motion = document.createElementNS("http://www.w3.org/2000/svg", "animateMotion");
+        motion.setAttribute("path", pathData);
+        motion.setAttribute("dur", `${2.2 + index * 0.08}s`);
+        motion.setAttribute("repeatCount", "indefinite");
+        circle.appendChild(motion);
+        particleGroup.appendChild(circle);
+      });
+      updateGraphHighlight();
+    }
+
+    function updateGraphHighlight() {
+      document.querySelectorAll(".graph-edge, .flow-particle").forEach(edge => {
+        const active = edge.dataset.from === selectedModuleId || edge.dataset.to === selectedModuleId;
+        edge.classList.toggle("is-active", active);
+        edge.classList.toggle("is-muted", !active);
+      });
+    }
+
+    function renderModuleDetail() {
+      const module = moduleById(selectedModuleId);
+      $("#module-detail").innerHTML = `
+        <div class="detail-top"><span class="detail-id">MODULE ${module.number} / ${module.en}</span><span class="tag orange">${module.cells.length} CELL${module.cells.length > 1 ? "S" : ""}</span></div>
+        <h3>${module.title}</h3><p class="detail-role">${module.role}</p>
+        <div class="io-pair"><div><span class="io-label">INPUT / 输入</span><p>${module.input}</p></div><div><span class="io-label">OUTPUT / 输出</span><p>${module.output}</p></div></div>
+        <div class="detail-block"><h4>为什么这样设计</h4><p>${module.why}</p></div>
+        <div class="detail-block"><h4>调用关系</h4><ul>${module.calls.map(call => `<li>${call}</li>`).join("")}</ul></div>
+        <div class="detail-block llm"><h4>迁移到 LLM</h4><p>${module.llm}</p></div>
+        <button class="button detail-action" id="open-source">打开对应源码 <span class="icon-arrow">↗</span></button>`;
+      $("#open-source").addEventListener("click", () => $("#source").scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth" }));
+    }
+
+    function renderSourceModuleList(filter = "") {
+      const query = filter.trim().toLowerCase();
+      const filtered = modules.filter(module => !query || [module.title, module.en, module.role, ...module.cells.map(cell => cell.code)].join(" ").toLowerCase().includes(query));
+      $("#source-module-list").innerHTML = filtered.map(module => `
+        <button class="source-module-button ${module.id === selectedModuleId ? "active" : ""}" data-source-module="${module.id}">
+          <span class="num">${module.number}</span><span><span class="name">${module.title}</span><span class="cells">${module.cells.map(cell => "cell-" + cell.id).join(" · ")}</span></span>
+        </button>`).join("");
+      $("#source-empty").style.display = filtered.length ? "none" : "block";
+      document.querySelectorAll("[data-source-module]").forEach(button => button.addEventListener("click", () => selectModule(button.dataset.sourceModule)));
+    }
+
+    function renderSource() {
+      const module = moduleById(selectedModuleId);
+      const selectedIndex = Math.min(selectedCellByModule[module.id] || 0, module.cells.length - 1);
+      const cell = module.cells[selectedIndex];
+      $("#cell-tabs").innerHTML = module.cells.map((item, index) => `<button class="cell-tab ${index === selectedIndex ? "active" : ""}" role="tab" aria-selected="${index === selectedIndex}" data-cell-index="${index}">cell-${item.id} · ${item.title}</button>`).join("");
+      document.querySelectorAll("[data-cell-index]").forEach(button => button.addEventListener("click", () => {
+        selectedCellByModule[module.id] = Number(button.dataset.cellIndex);
+        renderSource();
+      }));
+      $("#current-cell-label").textContent = `cell-${cell.id}`;
+      $("#code-content").innerHTML = renderCode(cell.code);
+      $("#source-notes").innerHTML = `<div class="eyebrow">MODULE ${module.number} / KEY OBSERVATIONS</div><h3>${module.title}</h3><span class="shape">${module.shape}</span><ol class="note-list">${module.insights.map(insight => `<li>${insight}</li>`).join("")}</ol><p class="cell-prose">当前：cell-${cell.id} · ${cell.title}。代码单元保留原始顺序与注释；本页模块划分是学习视图，不是对源文件的改写。</p>`;
+      document.querySelectorAll(".source-module-button").forEach(button => button.classList.toggle("active", button.dataset.sourceModule === selectedModuleId));
+    }
+
+    function selectModule(id) {
+      if (!moduleById(id)) return;
+      selectedModuleId = id;
+      document.querySelectorAll(".module-node").forEach(button => button.classList.toggle("active", button.dataset.module === id));
+      updateGraphHighlight();
+      renderModuleDetail();
+      renderSource();
+      if (window.updateSceneSelection) window.updateSceneSelection(id);
+    }
+
+    document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => {
+      graphMode = button.dataset.view;
+      document.querySelectorAll("[data-view]").forEach(item => {
+        const active = item === button;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-selected", active);
+      });
+      $("#graph-mode-label").textContent = graphViews[graphMode].label;
+      $("#flow-toggle").innerHTML = `<span aria-hidden="true">▶</span> ${graphMode === "data" ? "播放数据流" : "播放调用流"}`;
+      renderGraphEdges();
+    }));
+
+    $("#flow-toggle").addEventListener("click", () => {
+      flowPlaying = !flowPlaying;
+      $("#module-graph").classList.toggle("is-flowing", flowPlaying);
+      $("#flow-toggle").setAttribute("aria-pressed", flowPlaying);
+      $("#flow-toggle").innerHTML = flowPlaying ? '<span aria-hidden="true">Ⅱ</span> 暂停流动' : `<span aria-hidden="true">▶</span> ${graphMode === "data" ? "播放数据流" : "播放调用流"}`;
+    });
+
+    $("#module-search").addEventListener("input", event => renderSourceModuleList(event.target.value));
+    document.addEventListener("keydown", event => {
+      const typing = /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+      if (event.key === "/" && !typing) { event.preventDefault(); $("#module-search").focus(); }
+      if (event.key === "Escape" && document.activeElement === $("#module-search")) { event.target.value = ""; renderSourceModuleList(); event.target.blur(); }
+    });
+
+    function showToast(message) {
+      const toast = $("#toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    $("#copy-code").addEventListener("click", async () => {
+      const module = moduleById(selectedModuleId);
+      const cell = module.cells[selectedCellByModule[module.id] || 0];
+      try {
+        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(cell.code);
+        else {
+          const textarea = document.createElement("textarea");
+          textarea.value = cell.code;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          textarea.remove();
+        }
+        showToast(`cell-${cell.id} 已复制`);
+        $("#copy-code").textContent = "已复制";
+        setTimeout(() => $("#copy-code").textContent = "复制代码", 1600);
+      } catch (error) { showToast("复制失败，请手动选择代码"); }
+    });
+
+    const tensorStages = [
+      { name: "INPUT / X", shape: (b, f) => `[${b}, ${f}]` },
+      { name: "LINEAR 01", shape: b => `[${b}, 16]` },
+      { name: "RELU", shape: b => `[${b}, 16]` },
+      { name: "LINEAR 02", shape: b => `[${b}, 8]` },
+      { name: "RELU", shape: b => `[${b}, 8]` },
+      { name: "LINEAR 03", shape: b => `[${b}, 1]` },
+      { name: "SQUEEZE(1)", shape: b => `[${b}]` }
+    ];
+    let tensorFeatureCount = 88;
+    let forwardTimers = [];
+
+    function renderTensorLab() {
+      const batch = Number($("#batch-slider").value);
+      $("#batch-value").textContent = batch;
+      $("#tensor-flow").innerHTML = tensorStages.map((stage, index) => `<div class="tensor-stage ${index === tensorStages.length - 1 ? "output" : ""}" data-stage="${index}"><span class="stage-index">0${index + 1}</span><span class="stage-name">${stage.name}</span><span class="stage-shape">${stage.shape(batch, tensorFeatureCount)}</span></div>`).join("");
+      const count = tensorFeatureCount * 16 + 16 + 16 * 8 + 8 + 8 + 1;
+      $("#parameter-count").textContent = count.toLocaleString("en-US");
+      $("#parameter-formula").textContent = `${tensorFeatureCount}×16+16 + 16×8+8 + 8×1+1`;
+    }
+    $("#batch-slider").addEventListener("input", renderTensorLab);
+    document.querySelectorAll("[data-features]").forEach(button => button.addEventListener("click", () => {
+      tensorFeatureCount = Number(button.dataset.features);
+      document.querySelectorAll("[data-features]").forEach(item => {
+        const active = item === button;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-pressed", active);
+      });
+      renderTensorLab();
+    }));
+    $("#run-forward").addEventListener("click", () => {
+      forwardTimers.forEach(clearTimeout);
+      document.querySelectorAll(".tensor-stage").forEach(stage => stage.classList.remove("active"));
+      tensorStages.forEach((stage, index) => {
+        forwardTimers.push(setTimeout(() => {
+          document.querySelectorAll(".tensor-stage").forEach(item => item.classList.toggle("active", Number(item.dataset.stage) === index));
+        }, reducedMotion ? 0 : index * 240));
+      });
+      forwardTimers.push(setTimeout(() => document.querySelectorAll(".tensor-stage").forEach(stage => stage.classList.remove("active")), reducedMotion ? 300 : tensorStages.length * 240 + 500));
+    });
+
+    const loopSteps = [
+      { title: "清空梯度", code: "optimizer.zero_grad()", input: "上一 batch 的梯度", output: "梯度清零 / None", explanation: "PyTorch 默认把新梯度累加到 .grad。每个 batch 开头先清零，才能确保本次更新只使用当前 batch 的梯度。梯度累积是另一个显式技巧，不是这里省略 zero_grad 的理由。" },
+      { title: "前向传播", code: "pred = model(x)", input: "x [B,88]", output: "pred [B]", explanation: "model(x) 会调用 My_Model.forward。此时 PyTorch 记录可微操作并构建动态计算图，为后续反向传播保存必要中间值。" },
+      { title: "计算损失", code: "loss = criterion(pred, y)", input: "pred [B], y [B]", output: "标量 MSE", explanation: "MSELoss(reduction='mean') 先计算每个样本的平方误差，再对 batch 取均值，得到一个可反向传播的标量。pred 与 y 的形状一致，都是 [B]。" },
+      { title: "反向传播", code: "loss.backward()", input: "标量 loss 与计算图", output: "各参数的 .grad", explanation: "自动微分沿计算图反向应用链式法则。这里只计算梯度，不更新参数；backward 之后，参数本身仍保持原值。" },
+      { title: "更新参数", code: "optimizer.step()", input: "参数、梯度、lr=1e-5、momentum=0.7", output: "更新后的模型参数", explanation: "SGD 根据梯度与动量更新参数。学习率控制步长，momentum 利用历史更新方向平滑优化。更新后才进入下一个 batch。" },
+      { title: "验证模型", code: "model.eval()\nwith torch.no_grad():\n    pred = model(x)\n    loss = criterion(pred, y)", input: "valid_loader 与当前参数", output: "mean_valid_loss", explanation: "完成一个训练 epoch 后切换 eval，并在 no_grad 中验证。这里不构建计算图、不反向传播、不更新参数，因此验证数据不会参与训练。" },
+      { title: "保存或早停", code: "if mean_valid_loss < best_loss:\n    torch.save(model.state_dict(), config['save_path'])\nelse:\n    early_stop_count += 1", input: "当前验证损失与历史最佳", output: "最佳 checkpoint / 停止信号", explanation: "只有验证损失改善才保存模型，并把早停计数归零。连续 600 个 epoch 未改善就结束训练。最终推理加载的是最佳状态，而不是最后一个 epoch。" }
+    ];
+    let currentLoopStep = 0;
+    let loopTimer = null;
+
+    function renderLoop() {
+      $("#loop-steps").innerHTML = loopSteps.map((step, index) => `<button class="loop-step-button ${index === currentLoopStep ? "active" : ""}" role="tab" aria-selected="${index === currentLoopStep}" data-loop-step="${index}"><span class="step-num">STEP 0${index + 1}</span><span class="step-title">${step.title}</span></button>`).join("");
+      document.querySelectorAll("[data-loop-step]").forEach(button => button.addEventListener("click", () => { stopLoop(); currentLoopStep = Number(button.dataset.loopStep); renderLoop(); }));
+      const step = loopSteps[currentLoopStep];
+      $("#loop-detail").innerHTML = `<div class="loop-detail-head"><div><div class="eyebrow">TRAINER / EXECUTION ORDER</div><h3>${step.title}</h3></div><span class="loop-big-number">0${currentLoopStep + 1}</span></div><div class="loop-io"><span>IN: ${step.input}</span><span>OUT: ${step.output}</span></div><div class="loop-code">${escapeHTML(step.code)}</div><p class="loop-explain">${step.explanation}</p><div class="loop-controls"><button class="button small" id="loop-prev" ${currentLoopStep === 0 ? "disabled" : ""}>← 上一步</button><button class="button small primary" id="loop-next">${currentLoopStep === loopSteps.length - 1 ? "回到第一步" : "下一步 →"}</button><button class="button small" id="loop-play">▶ 自动演示</button></div><p class="loop-warning">顺序约束：zero_grad → forward → loss → backward → step；验证分支只执行 forward + loss，不执行 backward + step。</p>`;
+      $("#loop-prev").addEventListener("click", () => { if (currentLoopStep > 0) { currentLoopStep--; renderLoop(); } });
+      $("#loop-next").addEventListener("click", () => { currentLoopStep = (currentLoopStep + 1) % loopSteps.length; renderLoop(); });
+      $("#loop-play").addEventListener("click", startLoop);
+    }
+    function stopLoop() { if (loopTimer) { clearInterval(loopTimer); loopTimer = null; } }
+    function startLoop() {
+      stopLoop();
+      if (reducedMotion) { currentLoopStep = (currentLoopStep + 1) % loopSteps.length; renderLoop(); return; }
+      loopTimer = setInterval(() => { currentLoopStep = (currentLoopStep + 1) % loopSteps.length; renderLoop(); if (currentLoopStep === 0) stopLoop(); }, 1700);
+    }
+
+    function initScrollUI() {
+      const updateProgress = () => {
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        const progress = max > 0 ? Math.min(1, window.scrollY / max) : 0;
+        $("#progress-bar").style.transform = `scaleX(${progress})`;
+        $("#progress-text").textContent = String(Math.round(progress * 100)).padStart(3, "0");
+      };
+      let ticking = false;
+      window.addEventListener("scroll", () => { if (!ticking) { requestAnimationFrame(() => { updateProgress(); ticking = false; }); ticking = true; } }, { passive: true });
+      updateProgress();
+      const navObserver = new IntersectionObserver(entries => entries.forEach(entry => {
+        if (entry.isIntersecting) document.querySelectorAll(".main-nav a").forEach(link => link.classList.toggle("active", link.getAttribute("href") === `#${entry.target.id}`));
+      }), { rootMargin: "-25% 0px -65% 0px" });
+      document.querySelectorAll("[data-section]").forEach(section => navObserver.observe(section));
+      const revealObserver = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add("revealed"); revealObserver.unobserve(entry.target); } }), { threshold: 0.08 });
+      document.querySelectorAll("[data-reveal]").forEach(element => revealObserver.observe(element));
+    }
+
+    function initThreeScene() {
+      const container = $("#neural-scene");
+      if (!window.THREE) { initFallbackScene(container); return; }
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+      camera.position.set(0, 0.25, 9.4);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x000000, 0);
+      container.appendChild(renderer.domElement);
+      const group = new THREE.Group();
+      group.rotation.x = -0.22;
+      group.rotation.y = -0.18;
+      scene.add(group);
+      const nodeMeshes = [];
+      const positions = {};
+      const inkColor = 0x285d78, orangeColor = 0xd65b31;
+      modules.forEach((module, index) => {
+        const position = new THREE.Vector3((module.x - 50) / 12, (50 - module.y) / 13, Math.sin(index * 1.7) * 0.85);
+        positions[module.id] = position;
+        const geometry = new THREE.SphereGeometry(0.11, 20, 20);
+        const material = new THREE.MeshBasicMaterial({ color: module.id === selectedModuleId ? orangeColor : inkColor });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.copy(position);
+        mesh.userData.moduleId = module.id;
+        mesh.scale.setScalar(module.id === selectedModuleId ? 1.45 : 1);
+        group.add(mesh);
+        nodeMeshes.push(mesh);
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.18, 0.2, 32), new THREE.MeshBasicMaterial({ color: module.id === selectedModuleId ? orangeColor : inkColor, side: THREE.DoubleSide, transparent: true, opacity: 0.55 }));
+        ring.position.copy(position);
+        ring.userData.isRing = true;
+        group.add(ring);
+        const label = makeTextSprite(`M${module.number}`);
+        label.position.copy(position).add(new THREE.Vector3(0, 0.32, 0));
+        group.add(label);
+      });
+      graphViews.data.edges.forEach(([fromId, toId]) => {
+        const geometry = new THREE.BufferGeometry().setFromPoints([positions[fromId], positions[toId]]);
+        const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x7c98a5, transparent: true, opacity: 0.58 }));
+        group.add(line);
+      });
+      const grid = new THREE.GridHelper(9, 18, 0x9bb0b7, 0xc6d0cf);
+      grid.position.y = -2.7;
+      grid.material.transparent = true;
+      grid.material.opacity = 0.35;
+      scene.add(grid);
+      const particleGeometry = new THREE.BufferGeometry();
+      const particlePositions = [];
+      for (let i = 0; i < 80; i++) particlePositions.push(Math.sin(i * 12.31) * 4.5, Math.cos(i * 7.77) * 3.2, Math.sin(i * 3.19) * 2.5);
+      particleGeometry.setAttribute("position", new THREE.Float32BufferAttribute(particlePositions, 3));
+      const particles = new THREE.Points(particleGeometry, new THREE.PointsMaterial({ color: 0x7c98a5, size: 0.018, transparent: true, opacity: 0.5 }));
+      scene.add(particles);
+
+      function makeTextSprite(text) {
+        const canvas = document.createElement("canvas");
+        canvas.width = 256; canvas.height = 96;
+        const context = canvas.getContext("2d");
+        context.font = "600 38px IBM Plex Mono, monospace";
+        context.textAlign = "center"; context.textBaseline = "middle";
+        context.fillStyle = "#285d78"; context.fillText(text, 128, 48);
+        const texture = new THREE.CanvasTexture(canvas);
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
+        sprite.scale.set(0.72, 0.27, 1);
+        return sprite;
+      }
+      function resize() {
+        const width = container.clientWidth, height = container.clientHeight;
+        renderer.setSize(width, height);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+      }
+      const resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(container);
+      resize();
+      let dragging = false, moved = 0, lastX = 0, lastY = 0;
+      const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
+      container.addEventListener("pointerdown", event => { dragging = true; moved = 0; lastX = event.clientX; lastY = event.clientY; container.setPointerCapture(event.pointerId); });
+      container.addEventListener("pointermove", event => {
+        if (!dragging) return;
+        const dx = event.clientX - lastX, dy = event.clientY - lastY;
+        moved += Math.abs(dx) + Math.abs(dy);
+        group.rotation.y += dx * 0.006;
+        group.rotation.x = Math.max(-0.8, Math.min(0.5, group.rotation.x + dy * 0.004));
+        lastX = event.clientX; lastY = event.clientY;
+      });
+      container.addEventListener("pointerup", event => {
+        dragging = false;
+        if (moved < 7) {
+          const rect = container.getBoundingClientRect();
+          pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+          pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(pointer, camera);
+          const hits = raycaster.intersectObjects(nodeMeshes);
+          if (hits.length) { selectModule(hits[0].object.userData.moduleId); $("#atlas").scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth" }); }
+        }
+      });
+      window.updateSceneSelection = id => nodeMeshes.forEach(mesh => {
+        const active = mesh.userData.moduleId === id;
+        mesh.material.color.setHex(active ? orangeColor : inkColor);
+        mesh.scale.setScalar(active ? 1.45 : 1);
+      });
+      let visible = true;
+      new IntersectionObserver(entries => { visible = entries[0].isIntersecting; }).observe(container);
+      const clock = new THREE.Clock();
+      function animate() {
+        requestAnimationFrame(animate);
+        if (!visible) return;
+        const elapsed = clock.getElapsedTime();
+        if (!reducedMotion && !dragging) group.rotation.y += 0.0007;
+        nodeMeshes.forEach((mesh, index) => { if (!reducedMotion) mesh.position.z = positions[mesh.userData.moduleId].z + Math.sin(elapsed * 0.7 + index) * 0.045; });
+        renderer.render(scene, camera);
+      }
+      animate();
+    }
+
+    function initFallbackScene(container) {
+      const canvas = document.createElement("canvas");
+      container.appendChild(canvas);
+      const context = canvas.getContext("2d");
+      function draw() {
+        canvas.width = container.clientWidth * Math.min(devicePixelRatio, 2);
+        canvas.height = container.clientHeight * Math.min(devicePixelRatio, 2);
+        canvas.style.width = "100%"; canvas.style.height = "100%";
+        context.scale(Math.min(devicePixelRatio, 2), Math.min(devicePixelRatio, 2));
+        const width = container.clientWidth, height = container.clientHeight;
+        const points = modules.map(module => ({ x: module.x / 100 * width, y: module.y / 100 * height, module }));
+        context.strokeStyle = "#9bb0b7"; context.lineWidth = 1;
+        graphViews.data.edges.forEach(([from, to]) => { const a = points.find(p => p.module.id === from), b = points.find(p => p.module.id === to); context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke(); });
+        points.forEach(point => {
+          context.fillStyle = point.module.id === selectedModuleId ? "#d65b31" : "#285d78";
+          context.beginPath();
+          context.arc(point.x, point.y, 6, 0, Math.PI * 2);
+          context.fill();
+          context.font = "11px IBM Plex Mono, monospace";
+          context.fillText(`M${point.module.number}`, point.x + 10, point.y - 8);
+        });
+      }
+      new ResizeObserver(draw).observe(container);
+      canvas.addEventListener("click", event => {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left, y = event.clientY - rect.top;
+        const nearest = modules.map(module => ({ module, distance: Math.hypot(module.x / 100 * rect.width - x, module.y / 100 * rect.height - y) })).sort((a, b) => a.distance - b.distance)[0];
+        if (nearest && nearest.distance < 28) { selectModule(nearest.module.id); draw(); $("#atlas").scrollIntoView({ behavior: "smooth" }); }
+      });
+      window.updateSceneSelection = draw;
+      draw();
+    }
+
+    renderGraphNodes();
+    renderModuleDetail();
+    renderSourceModuleList();
+    renderSource();
+    renderTensorLab();
+    renderLoop();
+    initScrollUI();
+    initThreeScene();
+    new ResizeObserver(() => renderGraphEdges()).observe($("#module-graph"));
+  </script>
+</body>
+</html>
